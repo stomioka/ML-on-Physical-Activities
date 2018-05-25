@@ -1,0 +1,136 @@
+---
+title: "Quantification of quality of physical activities"
+author: "Sam Tomioka"
+date: "May 19, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr); library(caret); library(rattle); library(rpart);
+library(randomForest)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+The objective of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "train.csv")
+train = read.csv("train.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "test.csv")
+test = read.csv("test.csv")
+
+head(train)
+```
+## Model selection
+We will use random forest, gradient boosting machine, 
+
+## Parameter Tuning
+
+
+
+## Preprocessing data
+1. Drop unecessary data (identifiers, timing, and factor variables. Factor varaibels appeared to be that they should have been numeric variables, but contain some invalid characters and most of the values are missing, they are dropped.
+
+2. Normalize data using BoxCox transformations to continuous data to help normalize the variables through maximum likelihood. 
+3. Drop near zero variance variables with nearZeroVar (nzv)
+4. Impute missing data
+Three imputation methods are available in caret. K-nearest, bagged tree model for each predictor using the trainng set, and the median of the predictor's training set. For this project, bagged tree model will be used.This method is simple, accurate and accepts missing values.
+5. Decompose variables using PCA to reduce the number of varaibles
+
+```{r}
+#drop unecessary data (identifiers and timing)
+train1<-train[,-1:-7]
+test1<-test[,-1:-7]
+
+train2<-train1[,-153];test2<-test1[,-153]
+outcome <-train1[,153]
+
+#Identify factor varaibles and drop
+f<-split(names(train2),sapply(train2, function(x) paste(class(x), collapse=" -")))$factor
+train3<-train2[,!(names(train2) %in% f)]
+test3<-test2[,!(names(test2) %in% f)]
+
+
+
+#identify varaibles that are near zero variance
+nzv <- nearZeroVar(train3)
+train4 <- train3[, -nzv]
+test4 <- test3[, -nzv]
+
+
+  #remove NA columns
+
+na_count <-sapply(train4, function(y) sum(length(which(is.na(y)))))
+na_count <- subset(data.frame(na_count==0)); 
+keep<- row.names(subset(na_count, na_count$na_count==T))
+train4<-select(train4,keep)
+test4<-select(test4,keep)
+
+rm(train1, train, train2, train3, test, test1, test2, test3, na_count)
+#Normalize with BoxCox, impute with random forest, then decompose variables with PCA
+set.seed(100)
+preProcValues <-preProcess(train4, method=c("BoxCox","bagImpute","pca") ) ##non-numeric will be ignored
+
+#apply preprocessed object to train and test sets
+new_train <-predict(preProcValues, train4)
+new_test <-predict(preProcValues, test4)
+
+#add outcome
+
+new_train$classe<-as.factor(outcome);
+
+```
+## Parameter Tuning
+
+k- fold cross validation
+
+```{r}
+fitControl <- trainControl(## k-fold CV
+                           method = "repeatedcv",
+                           number = 3, #k
+                           ## repeated ten times
+                           repeats = 2)
+
+```
+## build model
+
+``` {r}
+set.seed(100)
+#random forest
+m_rf0<- train(classe ~., method="rf", trControl = fitControl,data=new_train, verbose=F)
+m_rf0
+summary(m_rf0$finalModel)
+set.seed(100)
+m_rpls0<- train(classe ~., method="pls", tuneLength=15, trControl = fitControl,data=new_train, verbose=F)
+m_rpls0
+summary(m_rpls0$finalModel)
+#boosting with tree
+set.seed(100)
+m_gbm0<- train(classe ~., method="gbm", trControl = fitControl,data=new_train, verbose=F)
+m_gbm0
+a<-summary(m_gbm0$finalModel)
+
+```
+The final model from the random forest has accuracy of 97%. 3 hold cross validation was repeated 2 times.
+The final model from the partial lease square has accuracy of 52%, so this will be not used.
+The final model from the boosting with tree has accuracy of 82%. It has n.trees = 150, interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10
+
+The fianl model selected is m_rf0 from the random forest.
+
+
