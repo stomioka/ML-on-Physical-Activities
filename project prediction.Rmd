@@ -19,6 +19,9 @@ The objective of this project is to use data from accelerometers on the belt, fo
 
 More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
 
+## Objective
+The objective is to identify and build the model that predicts the quality of physical activities.
+
 ## Data
 
 The training data for this project are available here:
@@ -30,18 +33,16 @@ The test data are available here:
 https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
 
 ```{r}
+
 download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "train.csv")
 train = read.csv("train.csv")
 download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "test.csv")
 test = read.csv("test.csv")
 
-head(train)
+#head(train)
 ```
 ## Model selection
-We will use random forest, gradient boosting machine, 
-
-## Parameter Tuning
-
+We will examine random forest, partial lease square, and gradient boosting machine.
 
 
 ## Preprocessing data
@@ -119,7 +120,7 @@ summary(m_rf0$finalModel)
 set.seed(100)
 m_rpls0<- train(classe ~., method="pls", tuneLength=15, trControl = fitControl,data=new_train, verbose=F)
 m_rpls0
-summary(m_rpls0$finalModel)
+
 #boosting with tree
 set.seed(100)
 m_gbm0<- train(classe ~., method="gbm", trControl = fitControl,data=new_train, verbose=F)
@@ -127,6 +128,10 @@ m_gbm0
 a<-summary(m_gbm0$finalModel)
 
 ```
+
+
+
+
 The final model from the random forest has accuracy of 97%. 3 hold cross validation was repeated 2 times.
 The final model from the partial lease square has accuracy of 52%, so this will be not used.
 The final model from the boosting with tree has accuracy of 82%. It has n.trees = 150, interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10
