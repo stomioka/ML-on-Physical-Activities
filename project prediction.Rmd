@@ -96,6 +96,12 @@ new_test <-predict(preProcValues, test4)
 
 new_train$classe<-as.factor(outcome);
 
+# partition to train and test
+set.seed(100)
+p<-createDataPartition(y=new_train$classe, p=0.7, list=F)
+train_cv<-new_train[p,]
+test_cv<-new_train[-p,]
+
 ```
 ## Parameter Tuning
 
@@ -104,7 +110,7 @@ k- fold cross validation
 ```{r}
 fitControl <- trainControl(## k-fold CV
                            method = "repeatedcv",
-                           number = 3, #k
+                           number = 5, #k
                            ## repeated ten times
                            repeats = 2)
 
@@ -114,16 +120,17 @@ fitControl <- trainControl(## k-fold CV
 ``` {r}
 set.seed(100)
 #random forest
-m_rf0<- train(classe ~., method="rf", trControl = fitControl,data=new_train, verbose=F)
+m_rf0<- train(classe ~., method="rf", trControl = fitControl,  data=train_cv, verbose=F)
 m_rf0
-summary(m_rf0$finalModel)
+#m_rf0$finalModel$err.rate
+plot(varImp(m_rf0), main = "Top 10 most important factors for prediction", top=10)
 set.seed(100)
-m_rpls0<- train(classe ~., method="pls", tuneLength=15, trControl = fitControl,data=new_train, verbose=F)
+m_rpls0<- train(classe ~., method="pls", tuneLength=15, trControl = fitControl,data=train_cv, verbose=F)
 m_rpls0
-
+# metric="RMSE"
 #boosting with tree
 set.seed(100)
-m_gbm0<- train(classe ~., method="gbm", trControl = fitControl,data=new_train, verbose=F)
+m_gbm0<- train(classe ~., method="gbm", trControl = fitControl,data=train_cv, verbose=F)
 m_gbm0
 a<-summary(m_gbm0$finalModel)
 
@@ -132,10 +139,30 @@ a<-summary(m_gbm0$finalModel)
 
 
 
-The final model from the random forest has accuracy of 97%. 3 hold cross validation was repeated 2 times.
+
+
+## Evaluate model with test set
+
+```{r}
+p_rf<-predict(m_rf0, newdata=test_cv)
+p_pls<-predict(m_rpls0, newdata=test_cv)
+p_gbm<-predict(m_gbm0, newdata=test_cv)
+
+confusionMatrix(test_cv$classe, p_rf)
+confusionMatrix(test_cv$classe, p_pls)
+confusionMatrix(test_cv$classe, p_gbm)
+```
+
+
+The final model from the random forest has accuracy of 98% with  95% CI : (0.9702, 0.9784). 5 hold cross validation was repeated 2 times.
 The final model from the partial lease square has accuracy of 52%, so this will be not used.
-The final model from the boosting with tree has accuracy of 82%. It has n.trees = 150, interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10
+The final model from the boosting with tree has accuracy of 82%. It has n.trees = 150, interaction.depth = 5, shrinkage = 0.1 and n.minobsinnode = 10
 
 The fianl model selected is m_rf0 from the random forest.
 
+## Predict on test
+
+```{r}
+predict(m_rf0, newdata=new_test)
+```
 
