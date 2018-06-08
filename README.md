@@ -1,5 +1,5 @@
 # ML-on-Physical-Activities
-Prediction Assignment Writeup
+
 
 # Background
 
